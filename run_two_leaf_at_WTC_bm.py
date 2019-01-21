@@ -25,30 +25,30 @@ def run_treatment(T, df, p, wind, pressure, Ca):
     days = df.doy
     hod = df.hod
     ndays = int(len(days) / 24.)
+    nhours = len(df)   #BM
 
-    #out = setup_output_dataframe(ndays) set hourly output
+#    out = setup_output_dataframe(ndays) BM
     out = setup_output_dataframe(nhours)
     i = 0
     j = 0
     while i < len(df):
         year = df.index.year[i]
         doy = df.doy[i]
-        hod = 0
+        hod = df.hod[i]
+# BM        for k in range(24):
 
-        #for k in range(24): DK set to hourly output
-
-            (An, et, Tcan,
-             apar, lai_leaf) = T.main(p, df.tair[i], df.par[i], df.vpd[i], wind,
+        (An, et, Tcan,
+        apar, lai_leaf) = T.main(p, df.tair[i], df.par[i], df.vpd[i], wind,
                                       pressure, Ca, doy, hod, df.lai[i])
 
-            out = update_output_hourly(i, j, An, et, Tcan, apar, lai_leaf, df,
+        out = update_output_hourly(doy, i, An, et, Tcan, apar, lai_leaf, df,
                                        p.footprint, out)
 
-            #hod += 1 DK
-            i += 1
+#BM            hod += 1
+        i += 1
 
-      # DK out = update_output_daily(j, year, doy, out)
-        # DK  j += 1
+# BM        out = update_output_daily(j, year, doy, out)
+#BM        j += 1
 
     return (out)
 
@@ -64,31 +64,34 @@ def setup_output_dataframe(ndays):
                         'LAI_can':zero, 'LAI_sun':zero, 'LAI_sha':zero})
     return (out)
 
-def update_output_hourly(i, j, An, et, Tcan, apar, lai_leaf, df, footprint, out):
+def update_output_hourly(doy, j, An, et, Tcan, apar, lai_leaf, df, footprint, out):
 
-    an_conv = c.UMOL_TO_MOL * c.MOL_C_TO_GRAMS_C * c.SEC_TO_HR
-    et_conv = c.MOL_WATER_2_G_WATER * c.G_TO_KG * c.SEC_TO_HR
+#    an_conv = c.UMOL_TO_MOL * c.MOL_C_TO_GRAMS_C * c.SEC_TO_HR
+#    et_conv = c.MOL_WATER_2_G_WATER * c.G_TO_KG * c.SEC_TO_HR
+    an_conv = 1.
+    et_conv = 1.
     sun_frac = lai_leaf[c.SUNLIT] / np.sum(lai_leaf)
     sha_frac = lai_leaf[c.SHADED] / np.sum(lai_leaf)
-    out.An_can[j] += np.sum(An) * an_conv
-    out.An_sun[j] += An[c.SUNLIT] * an_conv
-    out.An_sha[j] += An[c.SHADED] * an_conv
-    out.E_can[j] += np.sum(et) * et_conv
-    out.E_sun[j] += et[c.SUNLIT] * et_conv
-    out.E_sha[j] += et[c.SHADED] * et_conv
-    out.T_can[j] += (Tcan[c.SUNLIT] * sun_frac) + (Tcan[c.SHADED] * sha_frac)
-    out.T_sun[j] += Tcan[c.SUNLIT]
-    out.T_sha[j] += Tcan[c.SHADED]
-    out.APAR_can[j] += np.sum(apar)
-    out.APAR_sun[j] += apar[c.SUNLIT]
-    out.APAR_sha[j] += apar[c.SHADED]
-    out.LAI_can[j] += np.sum(lai_leaf)
-    out.LAI_sun[j] += lai_leaf[c.SUNLIT]
-    out.LAI_sha[j] += lai_leaf[c.SHADED]
+    out.doy[j] = doy
+    out.An_can[j] = np.sum(An) * an_conv
+    out.An_sun[j] = An[c.SUNLIT] * an_conv
+    out.An_sha[j] = An[c.SHADED] * an_conv
+    out.E_can[j] = np.sum(et) * et_conv
+    out.E_sun[j] = et[c.SUNLIT] * et_conv
+    out.E_sha[j] = et[c.SHADED] * et_conv
+    out.T_can[j] = (Tcan[c.SUNLIT] * sun_frac) + (Tcan[c.SHADED] * sha_frac)
+    out.T_sun[j] = Tcan[c.SUNLIT]
+    out.T_sha[j] = Tcan[c.SHADED]
+    out.APAR_can[j] = np.sum(apar)
+    out.APAR_sun[j] = apar[c.SUNLIT]
+    out.APAR_sha[j] = apar[c.SHADED]
+    out.LAI_can[j] = np.sum(lai_leaf)
+    out.LAI_sun[j] = lai_leaf[c.SUNLIT]
+    out.LAI_sha[j] = lai_leaf[c.SHADED]
 
     # Convert from per tree to m-2
-    out.An_obs[j] += df.FluxCO2[i] * c.MMOL_2_UMOL * an_conv / footprint
-    out.E_obs[j] += df.FluxH2O[i] * et_conv / footprint
+    out.An_obs[j] = df.FluxCO2[j] * c.MMOL_2_UMOL * an_conv / footprint
+    out.E_obs[j] = df.FluxH2O[j] * et_conv / footprint
 
     return out
 
@@ -110,6 +113,7 @@ if __name__ == "__main__":
     output_dir = "outputs"
     fpath = "C:/Repos/two_leaf_at_WTC/"
     fname = "met_data/met_data_gap_fixed.csv"
+
     fn = os.path.join(fpath, fname)
     df = pd.read_csv(fn)
     #df = df.drop(df.columns[0], axis=1)
@@ -127,7 +131,7 @@ if __name__ == "__main__":
     T = TwoLeaf(p, gs_model="medlyn")
 
     chambers = np.unique(df.chamber)
-    chambers = ["C05"]
+    #chambers = ["C05"]
     for chamber in chambers:
         print(chamber)
         dfx = df[(df.T_treatment == "ambient") &
